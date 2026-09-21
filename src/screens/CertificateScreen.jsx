@@ -1,3 +1,5 @@
+import { ASSETS } from '../data/company.js';
+
 export default function CertificateScreen({ v }) {
   return (
     <>
@@ -28,7 +30,7 @@ export default function CertificateScreen({ v }) {
             <div style={{ border: "1px solid #F5B800", padding: "34px 40px", position: "relative" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                  <img src="./assets/logo-aa.png" alt="A&A Services" style={{ height: "62px", width: "auto" }} />
+                  <img src={ASSETS.logo} alt="A&A Services" style={{ height: "62px", width: "auto" }} />
                   <div>
                     <div style={{ fontSize: "17px", fontWeight: 700, color: "#0B2A5B", lineHeight: 1.2 }}>
                       {"A & Associates"}

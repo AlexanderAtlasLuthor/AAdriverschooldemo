@@ -12,7 +12,9 @@ export default function CompleteScreen({ v }) {
             </h1>
             <div style={{ fontSize: "15px", color: "#C9D3E6" }}>
               {v.stName}
-              {" · Florida 4-Hour Basic Driver Improvement · Completed "}
+              {" · "}
+              {v.courseTitle}
+              {" · Completed "}
               {v.completionDate}
             </div>
           </div>

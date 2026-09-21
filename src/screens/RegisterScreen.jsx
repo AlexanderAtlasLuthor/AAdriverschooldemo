@@ -279,7 +279,7 @@ export default function RegisterScreen({ v }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>
-                {"Florida 4-Hour BDI Course"}
+                {v.courseTitle}
               </span>
               <span style={{ fontWeight: 700 }}>
                 {"TBD"}

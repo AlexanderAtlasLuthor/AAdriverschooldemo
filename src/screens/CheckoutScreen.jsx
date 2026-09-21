@@ -164,7 +164,7 @@ export default function CheckoutScreen({ v }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>
-                {"Florida 4-Hour Basic Driver Improvement Course"}
+                {v.courseTitle}
               </span>
               <span style={{ fontWeight: 700 }}>
                 {"TBD"}

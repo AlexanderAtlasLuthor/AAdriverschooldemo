@@ -1,11 +1,12 @@
-/* Base styles from the prototype's <helmet> block. */
-body { margin: 0; background: #F4F6FA; color: #1E2430; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
-a { color: #0B2A5B; } a:hover { color: #143A78; }
+/* Base styles shared by the platform and the course experience. Tokens live in platform.css. */
+body { margin: 0; background: var(--aa-bg, #F4F6FA); color: var(--aa-ink, #1E2430); font-family: var(--aa-font, "Helvetica Neue", Helvetica, Arial, sans-serif); -webkit-font-smoothing: antialiased; }
+a { color: var(--aa-navy, #0B2A5B); } a:hover { color: var(--aa-navy-2, #143A78); }
 input, select, textarea, button { font-family: inherit; }
+img { max-width: 100%; }
 @keyframes aaSpin { to { transform: rotate(360deg); } }
 @keyframes aaFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible {
-  outline: 3px solid #F5B800; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(11,42,91,0.35); border-radius: 4px;
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--aa-gold, #F5B800); outline-offset: 2px; box-shadow: 0 0 0 5px rgba(11,42,91,0.35); border-radius: 4px;
 }
 @media print {
   .aa-noprint { display: none !important; }
@@ -15,7 +16,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   @page { margin: 12mm; }
 }
 
-/* Hover rules extracted from the prototype's style-hover attributes. */
+/* Hover rules used by the course screens. */
 .aa-h1:hover { background: #F4F6FA; }
 .aa-h2:hover { background: #EEF2F9; }
 .aa-h3:hover { color: #F5B800; }

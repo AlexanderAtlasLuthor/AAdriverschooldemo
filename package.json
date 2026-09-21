@@ -1,9 +1,9 @@
 {
-  "name": "aa-online-training-bdi",
+  "name": "aa-online-training",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "A&A Online Training - Florida Basic Driver Improvement (BDI) course prototype, as a React app.",
+  "description": "A&A Online Training — platform front end (training worlds, course pages, shared My Learning) with the Florida BDI course experience.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

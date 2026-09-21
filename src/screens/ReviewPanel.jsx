@@ -4,12 +4,22 @@ export default function ReviewPanel({ v }) {
   return (
     <>
       <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(380px, 100vw)", maxWidth: "100%", background: "#1E2430", color: "#E6E9EF", zIndex: 65, overflowY: "auto", padding: "18px 18px 80px", boxShadow: "-10px 0 40px rgba(0,0,0,0.4)", boxSizing: "border-box" }}>
-        <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#F5B800", fontWeight: 700 }}>
-          {"Prototype only · not part of the student product"}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+          <div>
+            <div style={{ fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#F5B800", fontWeight: 700 }}>
+              {"Review mode · not part of the student product"}
+            </div>
+            <div style={{ fontSize: "18px", fontWeight: 700, margin: "4px 0 12px" }}>
+              {"Management review panel"}
+            </div>
+          </div>
+          <button type="button" onClick={v.togglePanel} aria-label="Close review panel" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: 0, borderRadius: "6px", width: "32px", height: "32px", fontSize: "16px", cursor: "pointer", flex: "none" }}>
+            {"×"}
+          </button>
         </div>
-        <div style={{ fontSize: "18px", fontWeight: 700, margin: "4px 0 12px" }}>
-          {"Management review panel"}
-        </div>
+        <button type="button" onClick={v.restartDemo} style={{ width: "100%", background: "#F5B800", color: "#0B2A5B", border: 0, borderRadius: "8px", padding: "10px 12px", fontSize: "13px", fontWeight: 700, cursor: "pointer", marginBottom: "12px" }} title="Clears saved progress so the whole journey can be demonstrated again">
+          {"Restart demo (clear saved progress)"}
+        </button>
         <label style={{ display: "flex", gap: "10px", alignItems: "center", background: "#2A3242", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", cursor: "pointer" }}>
           <input type="checkbox" checked={v.demo} onChange={v.toggleDemo} />
           <span>
@@ -39,12 +49,6 @@ export default function ReviewPanel({ v }) {
             </div>
           </Fragment>
         ))}
-        <div style={{ fontSize: "12px", color: "#9AA3B5", margin: "16px 0 6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          {"Documentation"}
-        </div>
-        <a href="BDI Prototype Report.dc.html" target="_blank" style={{ display: "block", padding: "8px 10px", borderRadius: "6px", fontSize: "13px", color: "#F5B800", background: "#252D3C", textDecoration: "none" }}>
-          {"Open the prototype report (screen inventory, journey map, module map, traceability) ↗"}
-        </a>
       </div>
     </>
   );

@@ -53,7 +53,7 @@ export default function DashboardScreen({ v }) {
                     {"My course"}
                   </div>
                   <div style={{ fontSize: "22px", fontWeight: 700, color: "#0B2A5B" }}>
-                    {"Florida 4-Hour Basic Driver Improvement"}
+                    {v.courseTitle}
                   </div>
                   <div style={{ fontSize: "13.5px", color: "#3A4352", marginTop: "4px" }}>
                     {"Status: "}

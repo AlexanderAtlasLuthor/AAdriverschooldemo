@@ -7,9 +7,14 @@ import React from 'react';
 import { AA_COURSE } from '../data/course.js';
 import { AA_PROTO } from '../data/helpers.js';
 import MediaImage from '../components/MediaImage.jsx';
+import { BDI_COURSE, getWorld } from '../data/trainingCatalog.js';
+import { CONTACT, COURSE_SUPPORT_NOTE } from '../data/company.js';
+import { LEGAL } from '../data/legalContent.js';
+import { isReviewMode } from '../utils/reviewMode.js';
+import { navigate } from '../router/navigation.js';
 
 export function createEngine() {
-  const D = AA_COURSE, H = AA_PROTO;
+  const D = AA_COURSE, H = AA_PROTO; const WORLD = getWorld(BDI_COURSE.worldId); const REVIEW = isReviewMode();
   const NAVY = '#0B2A5B', GOLD = '#F5B800', GREEN = '#1E7B34', RED = '#B3261E', MUTED = '#5B6577';
   const initialReg = { firstName: '', lastName: '', suffix: '', dob: '', email: '', username: '', password: '', phone: '', street: '', city: '', state: 'FL', zip: '', gender: '', dlState: 'FL', dlNumber: '', reason: '', ticketState: 'FL', citation: '', county: '', citationDate: '', agency: '', noCitation: false };
   const demoReg = { firstName: 'Maria', lastName: 'Santos', suffix: '', dob: '1988-07-18', email: 'maria.santos@example.com', username: 'msantos', password: 'demo1234', phone: '(561) 555-0142', street: '404 Lake Ave', city: 'Lake Worth', state: 'FL', zip: '33460', gender: 'Female', dlState: 'FL', dlNumber: 'S520-219-88-258-0', reason: 'elected', ticketState: 'FL', citation: 'A1B2C3E', county: 'Palm Beach', citationDate: '2026-08-02', agency: '(1) F.H.P.', noCitation: false };
@@ -19,7 +24,7 @@ export function createEngine() {
   const validationPlan = { 'm1:1': 2, 'm6:1': 4, 'm11:2': 9 }; // lesson key → validation question index
 
   const initialState = () => ({
-      screen: 'site', demo: true, panelOpen: false, toast: '', edgeNote: '',
+      screen: 'register', demo: true, panelOpen: false, toast: '', edgeNote: '',
       reg: { ...initialReg }, regAttempted: false, pay: { ...initialPay }, payAttempted: false, payError: '', orderState: 'idle', orderNo: '',
       infoAttempted: false, infoConfirmed: false, secAnswers: Array(10).fill(null), secAttempted: false, secSetupDone: false, attestChecked: false, attested: false,
       moduleIdx: 0, lessonIdx: 0, timeLeft: {}, completed: [], breaksDone: [], reviewMode: false, lockedMsg: '', modal: '', restoredNote: false,
@@ -30,13 +35,16 @@ export function createEngine() {
       cert: null, certAttempted: false, certConfirmed: false, delivery: '', completionDone: false, completionDate: '',
     });
   const M = initialState();
-  let inst = null; let timerStarted = false; let tickCount = 0; let lastTick = 0; let timerHandle = null; if (typeof window !== 'undefined') window.__AA = { M, D, get inst() { return inst; }, get started() { return timerStarted; }, get ticks() { return tickCount; }, tick: () => { if (inst) inst.tick(); } };
+  let inst = null; let timerStarted = false; let tickCount = 0;
+  // Debug handle: management-review / development only — never an unrestricted production global.
+  if (typeof window !== 'undefined' && REVIEW) window.__AA = { M, D, get inst() { return inst; }, get started() { return timerStarted; }, get ticks() { return tickCount; }, tick: () => { if (inst) inst.tick(); } };
   let tickN = 0; const upd = p => { const patch = typeof p === 'function' ? p(M) : p; if (patch) Object.assign(M, patch); tickN++; if (inst) inst._rerender(); };
   class CourseEngine {
     constructor() { this._rerender = () => {}; }
 
     mount() { inst = this;
-      try { const raw = localStorage.getItem('aa-bdi-proto-v1'); if (raw && !M._restored) { const d = JSON.parse(raw); if (d && d.v === 1) { const want = d.screen, scr = this.allowedScreen(want, d); Object.assign(M, d, { screen: ['break', 'sponsor', 'certificate', 'completionProcessing', 'processing'].includes(scr) ? (d.completionDone ? 'complete' : 'dashboard') : scr, breakState: null, pay: { ...initialPay }, payAttempted: false, panelOpen: false, modal: '', toast: '', reviewMode: false, _restored: true, restoredNote: true }); } } } catch (e) {}
+      try { const raw = localStorage.getItem('aa-bdi-proto-v1'); if (raw && !M._restored) { const d = JSON.parse(raw); if (d && d.v === 1) { d.reg = { ...initialReg, ...(d.reg || {}), password: '' }; /* passwords are never restored or re-saved */ const want = d.screen, scr = this.allowedScreen(want, d); Object.assign(M, d, { screen: ['break', 'sponsor', 'certificate', 'completionProcessing', 'processing'].includes(scr) ? (d.completionDone ? 'complete' : 'dashboard') : scr, breakState: null, pay: { ...initialPay }, payAttempted: false, panelOpen: false, modal: '', toast: '', reviewMode: false, _restored: true, restoredNote: true }); } } } catch (e) {}
+      if (M.screen === 'site' || M.screen === 'sponsor') M.screen = M.orderState === 'done' ? 'dashboard' : 'register';
       this._onPop = (e) => { const st = e.state; if (!st || !st.aaScreen) return; this._pop = true; const target = this.allowedScreen(st.aaScreen); upd({ screen: target, modal: '', toast: target !== st.aaScreen ? 'That step is not unlocked yet — you were returned to the closest screen you have access to.' : '' }); this._pop = false; };
       this._onKeyDown = (e) => { if (e.key === 'Escape' && M.modal) upd({ modal: '' }); };
       window.addEventListener('popstate', this._onPop); window.addEventListener('keydown', this._onKeyDown);
@@ -60,7 +68,8 @@ export function createEngine() {
     timeLeftFor(id) { const m = D.modules.find(x => x.id === id); return M.timeLeft[id] === undefined ? m.minutes * 60 : M.timeLeft[id]; }
     go(screen, extra = {}) { upd({ screen, toast: '', lockedMsg: '', panelOpen: false, modal: '', ...extra }); window.scrollTo(0, 0); this.pushHist(screen); this.persist(); }
     pushHist(screen) { try { if (this._pop) return; history.pushState({ aaScreen: screen, aaT: Date.now() }, ''); } catch (e) {} }
-    persist() { try { const s = M; localStorage.setItem('aa-bdi-proto-v1', JSON.stringify({ v: 1, screen: s.screen, moduleIdx: s.moduleIdx, lessonIdx: s.lessonIdx, timeLeft: s.timeLeft, completed: s.completed, breaksDone: s.breaksDone, reg: s.reg, secAnswers: s.secAnswers, secSetupDone: s.secSetupDone, attestChecked: s.attestChecked, attested: s.attested, infoConfirmed: s.infoConfirmed, orderState: s.orderState, orderNo: s.orderNo, quiz: s.quiz, exam: s.exam, signed: s.signed, signName: s.signName, signChecked: s.signChecked, cert: s.cert, certConfirmed: s.certConfirmed, delivery: s.delivery, completionDone: s.completionDone, completionDate: s.completionDate, demo: s.demo, locked: s.locked })); } catch (e) {} }
+    progressSnapshot() { const s = M; const doneMin = s.completed.reduce((a, id) => a + D.modules.find(m => m.id === id).minutes, 0) + s.breaksDone.length * 10; const status = s.completionDone ? 'completed' : s.exam.passed ? 'exam-passed' : s.completed.length ? 'in-progress' : 'enrolled'; return { pct: s.completionDone ? 100 : Math.round(100 * doneMin / 240), doneMinutes: doneMin, totalMinutes: 240, modulesDone: s.completed.length, modulesTotal: modIds.length, status, updatedAt: Date.now() }; }
+    persist() { try { const s = M; localStorage.setItem('aa-bdi-proto-v1', JSON.stringify({ v: 1, screen: s.screen, moduleIdx: s.moduleIdx, lessonIdx: s.lessonIdx, timeLeft: s.timeLeft, completed: s.completed, breaksDone: s.breaksDone, reg: { ...s.reg, password: '' }, progress: this.progressSnapshot(), secAnswers: s.secAnswers, secSetupDone: s.secSetupDone, attestChecked: s.attestChecked, attested: s.attested, infoConfirmed: s.infoConfirmed, orderState: s.orderState, orderNo: s.orderNo, quiz: s.quiz, exam: s.exam, signed: s.signed, signName: s.signName, signChecked: s.signChecked, cert: s.cert, certConfirmed: s.certConfirmed, delivery: s.delivery, completionDone: s.completionDone, completionDate: s.completionDate, demo: s.demo, locked: s.locked })); } catch (e) {} }
     allowedScreen(screen, st = M) {
       const done = modIds.every(id => (st.completed || []).includes(id)) && (st.breaksDone || []).length >= 2;
       const enrolled = st.orderState === 'done', inCourse = enrolled && st.attested, ex = st.exam || {};
@@ -75,7 +84,7 @@ export function createEngine() {
       if (st.signed) return 'certInfo';
       if (ex.passed) return 'postExam';
       if (enrolled) return 'dashboard';
-      return 'site';
+      return 'register';
     }
     scrollToId(id) { const el = document.getElementById(id); if (!el) { this.toast('That section is not available on this screen.'); return; } try { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 16, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, el.offsetTop); } }
     sanitize(s) { return String(s || 'Student').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48) || 'Student'; }
@@ -126,11 +135,11 @@ export function createEngine() {
     }
     toast(msg) { upd({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(() => upd({ toast: '' }), 4200); }
     // ---------- validation helpers
-    regErrors(reg = M.reg) {
+    regErrors(reg = M.reg, { account = true } = {}) {
       const e = {};
       if (!reg.firstName.trim()) e.firstName = 'Legal first name is required.'; if (!reg.lastName.trim()) e.lastName = 'Legal last name is required.';
       if (!H.dobOk(reg.dob)) e.dob = 'Enter your date of birth.'; if (!H.emailOk(reg.email)) e.email = 'Enter a valid e-mail address.';
-      if (reg.username.trim().length < 6 || !/^[a-z0-9]+$/i.test(reg.username)) e.username = 'Minimum six characters; only letters and numbers.'; if (reg.password.length < 6) e.password = 'Minimum six characters.';
+      if (reg.username.trim().length < 6 || !/^[a-z0-9]+$/i.test(reg.username)) e.username = 'Minimum six characters; only letters and numbers.'; if (account && (reg.password || '').length < 6) e.password = 'Minimum six characters.';
       if (!reg.street.trim() || !reg.city.trim() || !/^\d{5}(-\d{4})?$/.test(reg.zip)) e.address = 'Street, city and 5-digit ZIP are required.';
       if (!reg.reason) e.reason = 'Select the reason you are taking this course.';
       if (!reg.dlNumber.trim()) e.dlNumber = 'Driver license / ID number is required.';
@@ -189,17 +198,15 @@ export function createEngine() {
       const reviewRows = D.modules.map((m, i) => ({ key: m.id, label: m.num === 0 ? 'Introduction' : `Module ${m.num}`, title: m.title, minutes: `${m.minutes} min`, onOpen: () => this.go('player', { moduleIdx: i, lessonIdx: 0, reviewMode: true }) }));
       const cert = s.cert || {}; const reasonText = (H.reasons.find(r => r.v === (cert.reason || s.reg.reason)) || {}).t || '—';
       const breakRemaining = s.breakState ? s.breakState.remaining : 0;
-      const shell = s.screen !== 'site';
       const jump = (screen, extra) => () => { this.seedStudent(); this.go(screen, extra); };
       const panelJumps = [
-        { label: 'Public website', go: () => this.go('site') },
-        { label: 'Reset prototype state (clear saved progress)', go: () => { try { localStorage.removeItem('aa-bdi-proto-v1'); } catch (e) {} const fresh = initialState(); Object.keys(M).forEach(k => { delete M[k]; }); Object.assign(M, fresh, { _restored: true }); this.go('site'); this.toast('Prototype state cleared — the demo starts again from the public website.'); } }, { label: 'Registration', go: () => this.go('register') }, { label: 'Checkout', go: () => { this.go('checkout', { reg: s.reg.firstName ? s.reg : { ...demoReg } }); } }, { label: 'Receipt', go: jump('receipt') }, { label: 'Dashboard', go: jump('dashboard') },
+        { label: 'Platform homepage (A&A Online Training)', go: () => navigate('/') },
+        { label: 'Reset demo state (clear saved progress)', go: () => { try { localStorage.removeItem('aa-bdi-proto-v1'); } catch (e) {} const fresh = initialState(); Object.keys(M).forEach(k => { delete M[k]; }); Object.assign(M, fresh, { _restored: true }); this.go('register'); this.toast('Demo state cleared — the course demo starts again from registration.'); } }, { label: 'Registration', go: () => this.go('register') }, { label: 'Checkout', go: () => { this.go('checkout', { reg: s.reg.firstName ? s.reg : { ...demoReg } }); } }, { label: 'Receipt', go: jump('receipt') }, { label: 'Dashboard', go: jump('dashboard') },
         { label: 'Student information confirmation', go: jump('studentInfo') }, { label: 'Security questions setup', go: jump('securitySetup') }, { label: 'Eligibility / attestation', go: jump('attestation') },
         ...D.modules.map((m, i) => ({ label: m.num === 0 ? 'Introduction (4 min)' : `Module ${m.num} – ${m.title} (${m.minutes} min)`, go: () => this.jumpToModule(i) })),
         { label: 'Quiz (Module 1)', go: () => { this.jumpToModule(1); this.go('quizIntro', { timeLeft: { ...s.timeLeft, m1: 0 } }); } },
         { label: 'Break 1 (after Module 5)', go: () => { this.jumpToModule(6); this.go('break', { breakState: { num: 1, remaining: 572, nextIdx: 6 }, breaksDone: [] }); } },
         { label: 'Break 2 (before Module 11)', go: () => { this.jumpToModule(11); this.go('break', { breakState: { num: 2, remaining: 581, nextIdx: 11 }, breaksDone: [1] }); } },
-        { label: 'A&A Insurance message (after a break)', go: () => { this.jumpToModule(6); this.go('sponsor', { breakState: { num: 1, remaining: 0, nextIdx: 6 }, breaksDone: [1] }); } },
         { label: 'Final Review', go: () => { this.seedStudent(); this.go('finalReview', { completed: [...modIds], breaksDone: [1, 2], secSetupDone: true, attested: true, infoConfirmed: true }); } },
         { label: 'Final Exam', go: () => { this.seedStudent(); this.go('examIntro', { completed: [...modIds], breaksDone: [1, 2], exam: { ...exam, idx: 0, answers: {}, submitted: false, confirm: false } }); } },
         { label: 'Exam – failed result', go: () => { this.seedStudent(); upd({ completed: [...modIds], breaksDone: [1, 2] }); this.demoExam(false); } },
@@ -236,51 +243,32 @@ export function createEngine() {
       const addKeys = (arr, prop) => { (arr || []).forEach(r => { if (r && typeof r[prop] === 'function' && !r.onKey) r.onKey = keyed(r[prop]); }); return arr; };
       addKeys(moduleRows, 'onOpen'); addKeys(sideRows, 'onOpen'); addKeys(lessonRows, 'onOpen'); addKeys(reviewRows, 'onOpen'); addKeys(examChoices, 'onPick'); addKeys(deliveryOptions, 'onPick');
       (quizRows || []).forEach(q => addKeys(q.choices, 'onPick'));
-      const CONTACT = { phone: '(561) 533-5303', fax: '(561) 533-3858', addr: '951 Sansbury\'s Way, West Palm Beach, FL 33411', site: 'www.AAServices.com' };
       const MODALS = {
         help: { title: 'Help and student support', paras: [
-          'A & Associates can help with enrolment, course access, validation questions, exam problems and certificate processing.',
-          'Corporate headquarters: ' + CONTACT.addr,
+          'A&A Online Training can help with enrollment, course access, validation questions, exam problems and certificate processing.',
+          'Corporate headquarters: ' + CONTACT.address,
           'Phone: ' + CONTACT.phone + '   ·   Fax: ' + CONTACT.fax,
-          'Web: ' + CONTACT.site,
-          'Prototype note: a dedicated student-support e-mail address, chat channel and published support hours for the online course are TBD / Requires A&A Decision. Only contact details that already exist in the project are shown here.' ] },
-        signin: { title: 'Sign in — prototype', paras: [
-          'Returning-student sign in is not connected in this prototype. No accounts, passwords or sessions exist in this build, and none are simulated.',
-          'In production this screen would authenticate a returning student and restore their course position. The authentication method is TBD / Requires A&A Decision.',
-          'For this demo, start a new enrolment — the prototype remembers your progress in this browser so a refresh returns you to where you left off.' ],
-          actions: [{ label: 'Start / register for the course', primary: true, go: () => this.go('register', { edgeNote: '' }) }, { label: 'Return to home', go: () => this.go('site') }] },
-        terms: { title: 'Terms and Conditions — prototype draft', paras: [
-          'PROTOTYPE TEXT — REQUIRES FORMAL A&A AND LEGAL APPROVAL. No approved Terms and Conditions document exists in the project yet; the summary below describes the subjects the final document must cover.',
-          '1. The course. A&A Online Training provides the Florida 4-hour Basic Driver Improvement (BDI) course. The course requires 220 minutes of instruction and two 10-minute mandatory breaks, completed sequentially.',
-          '2. The student. The registered student must personally complete the course without unauthorised assistance. Identity is confirmed through security questions asked at random during the course.',
-          '3. Examination and certificate. A final examination of 40 questions must be passed with at least 32 correct answers (80%). A failed examination must be retaken; no certificate is issued for a failed examination. A completion statement must be signed before the certificate is processed.',
-          '4. Fees and refunds. Course price, the Florida state assessment fee shown at checkout, certificate delivery charges and the refund policy are TBD / Requires A&A Decision.',
-          '5. Reporting. Completion information is processed and reported as required by Florida. The technical reporting mechanism is TBD / Regulatory integration required.',
-          '6. Governing law and disputes. To be drafted by A&A counsel.' ] },
-        privacy: { title: 'Privacy Policy — prototype draft', paras: [
-          'PROTOTYPE TEXT — REQUIRES FORMAL A&A AND LEGAL APPROVAL. No approved Privacy Policy exists in the project yet; the summary below describes the subjects the final document must cover.',
-          '1. What is collected. Account details, legal name, date of birth, address, driver licence information and citation information — the fields required for course delivery and for certificate and state processing.',
-          '2. Why it is collected. To deliver the course, verify that the registered student completed it, issue the certificate and report completion as required by Florida.',
-          '3. Payment data. Card details are handled by a payment processor. This prototype does not store card numbers or security codes, and does not retain them when your progress is saved in this browser.',
-          '4. Sharing. Completion information is shared with the State of Florida and, where applicable, the court or agency named on your citation. Any other sharing is TBD / Requires A&A Decision.',
-          '5. Retention and your rights. Record-retention periods and how a student requests correction or deletion are TBD / Requires A&A Decision.',
-          '6. Prototype storage. This demo saves your course progress in your own browser (local storage) so a refresh does not lose the demo. It never stores payment data, and clearing your browser data removes it.' ] },
-        a11y: { title: 'Accessibility', paras: [
-          'The course is built to be usable with a keyboard: every control can be reached with Tab and activated with Enter or Space, and the focused control shows a visible gold outline.',
-          'Status messages, timer warnings and validation results are announced to screen readers.',
-          'Text can be enlarged with your browser zoom without losing controls; the layout reflows down to phone width.',
-          'Planned for a later phase: read-aloud narration, captions for instructional video, a text-size control and a high-contrast theme. The final accessibility feature set is TBD / Requires A&A Decision.',
-          'If you need help completing the course in another way, contact A & Associates on ' + CONTACT.phone + '.' ] },
+          'Web: ' + CONTACT.website,
+          COURSE_SUPPORT_NOTE ] },
+        signin: { title: 'Sign in — demo', paras: [
+          'Returning-student sign in is not connected in this demo. No accounts, passwords or sessions exist in this build, and none are simulated.',
+          'For this demo, start a new enrollment — the demo remembers your progress in this browser so a refresh returns you to where you left off.' ],
+          actions: [{ label: 'Start / register for the course', primary: true, go: () => this.go('register', { edgeNote: '' }) }, { label: 'Go to A&A Online Training', go: () => navigate('/') }] },
+        // Legal / accessibility copy is shared with the platform pages (src/data/legalContent.js).
+        terms: { title: LEGAL.terms.title + ' — ' + LEGAL.terms.status.toLowerCase(), paras: [LEGAL.terms.intro, ...LEGAL.terms.paras] },
+        privacy: { title: LEGAL.privacy.title + ' — ' + LEGAL.privacy.status.toLowerCase(), paras: [LEGAL.privacy.intro, ...LEGAL.privacy.paras] },
+        a11y: { title: LEGAL.accessibility.title, paras: [LEGAL.accessibility.intro, ...LEGAL.accessibility.paras] },
       };
       const mk = MODALS[s.modal] || null;
       return {
         // flags
         hasModal: !!mk, modalTitle: mk ? mk.title : '', modalParas: mk ? mk.paras.map((text, i) => ({ key: i, text })) : [],
         modalActions: mk && mk.actions ? mk.actions.map((a, i) => ({ key: i, label: a.label, onClick: a.go, bg: a.primary ? NAVY : '#FFFFFF', fg: a.primary ? '#FFFFFF' : NAVY, border: a.primary ? NAVY : '#0B2A5B' })) : [],
-        goHome: () => this.go('site'),
-        restartDemo: () => { try { localStorage.removeItem('aa-bdi-proto-v1'); } catch (e) {} const fresh = initialState(); Object.keys(M).forEach(k => { delete M[k]; }); Object.assign(M, fresh, { _restored: true }); this.go('site'); this.toast('Demo restarted — saved progress cleared. You can run the whole journey again from the public website.'); },
+        // platform navigation (the course experience lives at /course/bdi inside the A&A Online Training shell)
+        goHome: () => navigate('/'), goMyLearning: () => navigate('/my-learning'), goWorld: () => navigate(WORLD.path), goCoursePage: () => navigate(BDI_COURSE.path),
+        courseTitle: BDI_COURSE.displayTitle, courseName: BDI_COURSE.name, worldName: WORLD.name, reviewTools: REVIEW,
+        restartDemo: () => { try { localStorage.removeItem('aa-bdi-proto-v1'); } catch (e) {} const fresh = initialState(); Object.keys(M).forEach(k => { delete M[k]; }); Object.assign(M, fresh, { _restored: true }); this.go('register'); this.toast('Demo restarted — saved progress cleared. The course demo begins again at registration.'); },
         closeModal: () => set({ modal: '' }), openHelp: () => set({ modal: 'help' }), openSignIn: () => set({ modal: 'signin' }), openTerms: () => set({ modal: 'terms' }), openPrivacy: () => set({ modal: 'privacy' }), openA11y: () => set({ modal: 'a11y' }),
-        navCourses: () => this.scrollToId('courses'), navHow: () => this.scrollToId('how-it-works'), navRequirements: () => this.scrollToId('florida-requirements'),
         downloadCertificate: () => {
           try {
             const v = { name: (s.cert && s.cert.firstName ? [s.cert.firstName, s.cert.middleName, s.cert.lastName].filter(Boolean).join(' ') : stName).toUpperCase(),
@@ -299,13 +287,13 @@ export function createEngine() {
         isFirstLesson: s.lessonIdx === 0, prevDisabled: s.lessonIdx === 0, nextDisabled: isLastLesson,
         prevOpacity: s.lessonIdx === 0 ? 0.45 : 1, nextOpacity: isLastLesson ? 0.45 : 1,
         restoredNote: !!s.restoredNote, dismissRestored: () => set({ restoredNote: false }),
-        shell, isSite: s.screen === 'site', isRegister: s.screen === 'register', isCheckout: s.screen === 'checkout', isProcessing: s.screen === 'processing', isReceipt: s.screen === 'receipt', isSponsor: s.screen === 'sponsor', isCertificate: s.screen === 'certificate', isDashboard: s.screen === 'dashboard' || s.screen === 'postExam', isPostExam: s.screen === 'postExam', isDashboardOnly: s.screen === 'dashboard', isStudentInfo: s.screen === 'studentInfo', isSecuritySetup: s.screen === 'securitySetup', isSecurityConfirm: s.screen === 'securityConfirm', isAttestation: s.screen === 'attestation', isPlayer: s.screen === 'player', isQuizIntro: s.screen === 'quizIntro', isQuiz: s.screen === 'quiz', isQuizResult: s.screen === 'quizResult', isBreak: s.screen === 'break', isFinalReview: s.screen === 'finalReview', isExamIntro: s.screen === 'examIntro', isExam: s.screen === 'exam', isExamResult: s.screen === 'examResult', isSign: s.screen === 'sign', isCertInfo: s.screen === 'certInfo', isDelivery: s.screen === 'delivery', isCompletionProcessing: s.screen === 'completionProcessing', isComplete: s.screen === 'complete', isLocked: s.screen === 'locked',
-        demo: s.demo, demoLabel: s.demo ? 'DEMO MODE ON – timers run 60× faster (PROTOTYPE ONLY)' : 'Demo mode off – real time', toggleDemo: () => set({ demo: !s.demo }), panelOpen: s.panelOpen, togglePanel: () => set({ panelOpen: !s.panelOpen }), panelJumps, edgeStates, toast: s.toast, hasToast: !!s.toast, edgeNote: s.edgeNote, hasEdgeNote: !!s.edgeNote,
+        shell: true, isRegister: s.screen === 'register', isCheckout: s.screen === 'checkout', isProcessing: s.screen === 'processing', isReceipt: s.screen === 'receipt', isCertificate: s.screen === 'certificate', isDashboard: s.screen === 'dashboard' || s.screen === 'postExam', isPostExam: s.screen === 'postExam', isDashboardOnly: s.screen === 'dashboard', isStudentInfo: s.screen === 'studentInfo', isSecuritySetup: s.screen === 'securitySetup', isSecurityConfirm: s.screen === 'securityConfirm', isAttestation: s.screen === 'attestation', isPlayer: s.screen === 'player', isQuizIntro: s.screen === 'quizIntro', isQuiz: s.screen === 'quiz', isQuizResult: s.screen === 'quizResult', isBreak: s.screen === 'break', isFinalReview: s.screen === 'finalReview', isExamIntro: s.screen === 'examIntro', isExam: s.screen === 'exam', isExamResult: s.screen === 'examResult', isSign: s.screen === 'sign', isCertInfo: s.screen === 'certInfo', isDelivery: s.screen === 'delivery', isCompletionProcessing: s.screen === 'completionProcessing', isComplete: s.screen === 'complete', isLocked: s.screen === 'locked',
+        demo: s.demo, demoLabel: s.demo ? 'Demo mode · timers run 60× faster' : 'Demo mode off · real time', toggleDemo: () => set({ demo: !s.demo }), panelOpen: s.panelOpen, togglePanel: () => set({ panelOpen: !s.panelOpen }), panelJumps, edgeStates, toast: s.toast, hasToast: !!s.toast, edgeNote: s.edgeNote, hasEdgeNote: !!s.edgeNote,
         stName, studentInitials: stName.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase(), today: H.today(),
         // site
-        goRegister: () => this.go('register', { edgeNote: '' }), goSite: () => this.go('site'),
+        goRegister: () => this.go('register', { edgeNote: '' }), goSite: () => this.go('register'),
         // registration
-        reg: s.reg, onReg: field('reg'), regErr, hasRegErrors: Object.keys(regErr).length > 0, regErrorCount: Object.keys(regErr).length, showCitation: !s.reg.noCitation && s.reg.reason !== 'insurance', reasons: H.reasons.map(r => ({ ...r, key: r.v })), counties: H.counties.map(c => ({ key: c, c })), agencies: H.agencies.map(a => ({ key: a, a })),
+        reg: s.reg, onReg: field('reg'), regErr, hasRegErrors: Object.values(regErr).some(Boolean), regErrorCount: Object.values(regErr).filter(Boolean).length, showCitation: !s.reg.noCitation && s.reg.reason !== 'insurance', reasons: H.reasons.map(r => ({ ...r, key: r.v })), counties: H.counties.map(c => ({ key: c, c })), agencies: H.agencies.map(a => ({ key: a, a })),
         fillDemoReg: () => set({ reg: { ...demoReg }, regAttempted: false, edgeNote: '' }), submitReg: () => { const e = this.regErrors(); if (Object.keys(e).length) { set({ regAttempted: true }); window.scrollTo(0, 0); return; } this.go('checkout', { regAttempted: false, edgeNote: '' }); },
         // checkout
         pay: s.pay, onPay: field('pay'), payErr, payError: s.payError, hasPayError: !!s.payError, orderFailed: s.orderState === 'failed', fillDemoPay: () => set({ pay: { cardName: `${s.reg.firstName} ${s.reg.lastName}`.trim() || 'Maria Santos', cardNumber: '4111111111111111', exp: '09/28', cvv: '123', billingZip: s.reg.zip || '33460', terms: true, privacy: true }, payAttempted: false, payError: '' }),
@@ -319,7 +307,7 @@ export function createEngine() {
         objectives: ['I. To help participants become responsible drivers by providing them with accurate and current information.', 'II. To help participants realize that proper attitudes will make them safer drivers.', 'III. To remind participants of Florida Law as it pertains to the operation of a motor vehicle.', 'IV. To help participants develop respect for obedience of traffic laws as a result of their knowledge of Florida Law.', 'V. To help participants realize that to be good drivers, they must practice courtesy, discipline and patience in their driving behaviors.'].map((t, i) => ({ key: i, t })),
         examRecordText: s.exam.submitted ? `${s.completionDate || H.today()} · Score: ${s.exam.score} of 40 (${Math.round(100 * s.exam.score / 40)}%) · ${s.exam.passed ? 'PASSED' : 'NOT PASSED'}` : 'No exam attempts yet',
         // student info confirmation
-        infoErr: fillKeys(s.infoAttempted ? this.regErrors() : {}, ['firstName', 'lastName', 'dob', 'address', 'reason', 'dlNumber', 'county', 'citation', 'citationDate']), hasInfoErrors: s.infoAttempted && Object.keys(this.regErrors()).length > 0, confirmInfo: () => { const e = this.regErrors(); if (Object.keys(e).length) { set({ infoAttempted: true }); window.scrollTo(0, 0); return; } this.go('securitySetup', { infoConfirmed: true, infoAttempted: false, edgeNote: '' }); }, reasonText: (H.reasons.find(r => r.v === s.reg.reason) || {}).t || '—',
+        infoErr: fillKeys(s.infoAttempted ? this.regErrors(s.reg, { account: false }) : {}, ['firstName', 'lastName', 'dob', 'address', 'reason', 'dlNumber', 'county', 'citation', 'citationDate']), hasInfoErrors: s.infoAttempted && Object.keys(this.regErrors(s.reg, { account: false })).length > 0, confirmInfo: () => { const e = this.regErrors(s.reg, { account: false }); if (Object.keys(e).length) { set({ infoAttempted: true }); window.scrollTo(0, 0); return; } this.go('securitySetup', { infoConfirmed: true, infoAttempted: false, edgeNote: '' }); }, reasonText: (H.reasons.find(r => r.v === s.reg.reason) || {}).t || '—',
         // security setup
         secRows, secComplete, secAttempted: s.secAttempted, saveSecurity: () => { if (!secComplete) { set({ secAttempted: true }); return; } this.go('securityConfirm', { secAttempted: false }); }, confirmSecurity: () => this.go('attestation', { secSetupDone: true }), backToSecurity: () => this.go('securitySetup'), printPage: () => { try { window.print(); } catch (e) { this.toast('Use your browser print command to print this page.'); } }, attestationText: D.attestation,
         // attestation
@@ -342,8 +330,8 @@ export function createEngine() {
         quizScoreText: `${quizCorrect} of ${quizTotal} correct`, quizPassed: quizCorrect === quizTotal, quizMissed: quizCorrect < quizTotal, quizContinue: () => this.finishModule(), submitOpacity: quizAllAnswered ? 1 : 0.5,
         // break
         breakNum: s.breakState ? s.breakState.num : 1, breakTimer: H.fmt(breakRemaining), breakDone: s.breakState ? breakRemaining <= 0 : false, breakNotDone: s.breakState ? breakRemaining > 0 : true, breakPct: s.breakState ? Math.round(100 * (1 - breakRemaining / 600)) : 0, breakContinueOpacity: s.breakState && breakRemaining <= 0 ? 1 : 0.45,
-        breakContinue: () => { if (!s.breakState || s.breakState.remaining > 0) { this.toast('The mandatory break is still in progress. Continue becomes available at 00:00.'); return; } this.go('sponsor', { breaksDone: [...s.breaksDone, s.breakState.num] }); }, sponsorQuote: () => this.toast('A&A Insurance quote request – TBD / Requires A&A Decision (marketing integration not established by the mapping).'), sponsorNext: () => { const next = s.breakState ? s.breakState.nextIdx : modIds.length; upd({ breakState: null }); if (next < modIds.length) this.startModule(next); else this.go('finalReview'); }, demoFinishBreak: () => set({ breakState: { ...s.breakState, remaining: 0 } }),
-        sponsorNextLabel: s.breakState && s.breakState.nextIdx < modIds.length ? `Module ${D.modules[s.breakState.nextIdx].num} – ${D.modules[s.breakState.nextIdx].title}` : 'Final Review', sponsorBreakNum: s.breakState ? s.breakState.num : 1,
+        // After a completed break the course continues directly with the next module — no unrelated cross-promotion in the instructional journey.
+        breakContinue: () => { if (!s.breakState || s.breakState.remaining > 0) { this.toast('The mandatory break is still in progress. Continue becomes available at 00:00.'); return; } const next = s.breakState.nextIdx; upd({ breaksDone: s.breaksDone.includes(s.breakState.num) ? s.breaksDone : [...s.breaksDone, s.breakState.num], breakState: null }); if (next < modIds.length) this.startModule(next); else this.go('finalReview'); }, demoFinishBreak: () => set({ breakState: { ...s.breakState, remaining: 0 } }),
         breakNextText: s.breakState && s.breakState.nextIdx < modIds.length ? `Next: Module ${D.modules[s.breakState.nextIdx].num} – ${D.modules[s.breakState.nextIdx].title}` : 'Next: Final Review',
         // final review
         reviewRows, instrDoneText: `${s.completed.reduce((a, id) => a + D.modules.find(m => m.id === id).minutes, 0)} of 220 instructional minutes completed`, breaksText: `${s.breaksDone.length} of 2 mandatory breaks completed`, allDone: this.allDone() && s.breaksDone.length === 2, goExamIntro: () => this.go('examIntro', { exam: { ...exam, idx: 0, answers: {}, submitted: false, confirm: false } }),
@@ -358,7 +346,7 @@ export function createEngine() {
         signName: s.signName, onSignName: (e) => set({ signName: e.target.value }), signChecked: s.signChecked, toggleSign: (e) => set({ signChecked: e.target.checked }), signNameOk: s.signName.trim().toLowerCase() === stName.toLowerCase(), goSign: () => this.go('sign'),
         submitSign: () => { if (s.signName.trim().toLowerCase() !== stName.toLowerCase()) { this.toast(`Type your full legal name exactly as registered: ${stName}`); return; } if (!s.signChecked) { this.toast('Check the certification box to sign.'); return; } this.go('certInfo', { signed: true, cert: s.cert || { ...s.reg, verify: false } }); },
         // certificate info
-        cert, onCert: field('cert'), certErr, hasCertErrors: Object.keys(certErr).length > 0, certReasonText: reasonText, certExamText: `${s.exam.score || 39} of 40 (${Math.round(100 * (s.exam.score || 39) / 40)}%)`,
+        cert, onCert: field('cert'), certErr, hasCertErrors: Object.values(certErr).some(Boolean), certReasonText: reasonText, certExamText: `${s.exam.score || 39} of 40 (${Math.round(100 * (s.exam.score || 39) / 40)}%)`,
         confirmCert: () => { const e = this.certErrors(); if (Object.keys(e).length) { set({ certAttempted: true }); window.scrollTo(0, 0); return; } this.go('delivery', { certConfirmed: true, certAttempted: false }); },
         // delivery & completion
         deliveryOptions, deliveryChosen: !!s.delivery, submitDelivery: () => { if (!s.delivery) { this.toast('Select a certificate delivery method.'); return; } this.go('completionProcessing'); setTimeout(() => this.go('complete', { completionDone: true }), 2600); },
@@ -369,8 +357,7 @@ export function createEngine() {
         certId: 'AA-BDI-' + (s.orderNo || 'SAMPLE') + '-' + String(s.exam.score || 0).padStart(2, '0'),
         certReason: reasonText, certDl: (s.cert && s.cert.dlNumber) || (s.reg.dlNumber || 'TBD'), certDlState: (s.cert && s.cert.dlState) || 'FL',
         certCounty: (s.cert && s.cert.county) || '—', certCitation: (s.cert && s.cert.citation) || '—',
-        contactSupport: () => set({ modal: 'help' }), howItWorks: () => this.scrollToId('how-it-works'), a11yInfo: () => set({ modal: 'a11y' }), readAloudInfo: () => this.toast('Read-aloud narration is Supported by Mapping (the source course offered an audio read-along). It will be implemented in a later phase — no narration audio exists in this build.'), viewCertificate: () => this.toast('Certificate preview – A&A UX Enhancement. Official certificate format and issuance system: TBD / External Integration Required.'), returnToDashboard: () => this.go('dashboard'), unlockDemo: () => { this.seedStudent(); this.go('dashboard', { locked: false, validation: { ...s.validation, active: false, result: null, failures: 0 } }); },
-        goReport: () => { const u = 'BDI Prototype Report.dc.html'; try { fetch(u, { method: 'GET' }).then(r => { if (r.ok) window.open(u, '_blank'); else this.toast('The prototype report is not included in this build. Open "BDI Prototype Report" from the project instead.'); }).catch(() => this.toast('The prototype report is not included in this build. Open "BDI Prototype Report" from the project instead.')); } catch (e) { this.toast('The prototype report is not included in this build.'); } },
+        contactSupport: () => set({ modal: 'help' }), a11yInfo: () => set({ modal: 'a11y' }), readAloudInfo: () => this.toast('Read-aloud narration is Supported by Mapping (the source course offered an audio read-along). It will be implemented in a later phase — no narration audio exists in this build.'), returnToDashboard: () => this.go('dashboard'), unlockDemo: () => { this.seedStudent(); this.go('dashboard', { locked: false, validation: { ...s.validation, active: false, result: null, failures: 0 } }); },
       };
     }
   }

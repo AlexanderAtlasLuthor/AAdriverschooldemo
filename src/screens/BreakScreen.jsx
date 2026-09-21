@@ -1,8 +1,10 @@
+import { ASSETS } from '../data/company.js';
+
 export default function BreakScreen({ v }) {
   return (
     <>
       <div style={{ flex: 1, background: "#0B2A5B", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "18px", padding: "40px 20px" }}>
-        <img src="./assets/logo-aa-training.png" alt="A&A Online Training" style={{ height: "46px", width: "auto" }} />
+        <img src={ASSETS.logoTraining} alt="A&A Online Training" style={{ height: "46px", width: "auto" }} />
         <div style={{ background: "#fff", borderRadius: "14px", maxWidth: "640px", width: "100%", padding: "34px 36px", textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,0.35)" }}>
           <div style={{ display: "inline-block", background: "#FFF4D6", color: "#7A5A00", fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em", padding: "5px 12px", borderRadius: "3px", textTransform: "uppercase" }}>
             {"Mandatory Break "}

@@ -56,7 +56,7 @@ export default function ReceiptScreen({ v }) {
                 {"Course"}
               </div>
               <div style={{ fontWeight: 700 }}>
-                {"Florida 4-Hour Basic Driver Improvement"}
+                {v.courseTitle}
               </div>
             </div>
             <div>
